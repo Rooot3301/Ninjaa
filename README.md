@@ -39,6 +39,6 @@ Ce script shell permet de gérer l’installation, la vérification et la désin
 Clonez ce dépôt et donnez les permissions d’exécution au script.
 
 ```bash
-git clone https://github.com/Rooot3301/agent-management-script.git
+git clone https://github.com/Rooot3301/Ninjaa.git
 cd Ninjaa
 chmod +x main.sh

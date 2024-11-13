@@ -1,56 +1,75 @@
-# Crée par Romain 
-#
-# Le 13/11/2024
-#
-
-
 #!/bin/bash
 
 # Variables
 DOWNLOAD_DIR="/tmp"
-AGENT_URL="https://example.com/path/to/ninjarmm-agent.rpm"  # Remplacez par l'URL réelle de l'agent
+LOG_DIR="/log"
+LOG_FILE="$LOG_DIR/agent_install.log"
 SERVICE_NAME="ninjarmm-agent.service"
 
+# Créer le dossier de logs s'il n'existe pas
+if [ ! -d "$LOG_DIR" ]; then
+    mkdir -p "$LOG_DIR"
+    echo "[$(date +"%Y-%m-%d %H:%M:%S")] Dossier $LOG_DIR créé." >> "$LOG_FILE"
+fi
+
 # Fonctions
+function log() {
+    echo "[$(date +"%Y-%m-%d %H:%M:%S")] $1" | tee -a "$LOG_FILE"
+}
+
 function download_and_install() {
-    echo "Téléchargement de l'agent dans $DOWNLOAD_DIR..."
+    # Demander à l'utilisateur d'entrer l'URL
+    read -p "Veuillez entrer l'URL de l'agent à télécharger : " AGENT_URL
     FILENAME=$(basename "$AGENT_URL")
-    curl -o "$DOWNLOAD_DIR/$FILENAME" "$AGENT_URL"
+    
+    # Télécharger l'agent
+    log "Téléchargement de l'agent depuis $AGENT_URL vers $DOWNLOAD_DIR..."
+    curl -o "$DOWNLOAD_DIR/$FILENAME" "$AGENT_URL" &>> "$LOG_FILE"
 
     # Vérifier si le téléchargement a réussi
     if [ $? -eq 0 ]; then
-        echo "Téléchargement réussi."
-        # Installer le fichier RPM avec sudo
-        sudo rpm -i "$DOWNLOAD_DIR/$FILENAME" && echo "Agent installé avec succès."
+        log "Téléchargement réussi."
+        log "Installation de l'agent..."
+        sudo rpm -i "$DOWNLOAD_DIR/$FILENAME" &>> "$LOG_FILE"
+        if [ $? -eq 0 ]; then
+            log "Agent installé avec succès."
+        else
+            log "Erreur lors de l'installation de l'agent."
+        fi
     else
-        echo "Erreur lors du téléchargement. Veuillez vérifier l'URL et réessayer."
+        log "Erreur lors du téléchargement. Veuillez vérifier l'URL et réessayer."
     fi
 }
 
 function check_service_status() {
-    echo "Vérification du statut du service $SERVICE_NAME..."
+    log "Vérification du statut du service $SERVICE_NAME..."
     if systemctl is-active --quiet "$SERVICE_NAME"; then
-        echo "Le service $SERVICE_NAME est actif et fonctionne correctement."
+        log "Le service $SERVICE_NAME est actif et fonctionne correctement."
     else
-        echo "Le service $SERVICE_NAME n'est pas actif."
+        log "Le service $SERVICE_NAME n'est pas actif."
     fi
 }
 
 function uninstall_agent() {
-    echo "Désinstallation de l'agent..."
-    sudo rpm -e "ninjarmm-agent" && echo "Agent désinstallé avec succès."
+    log "Désinstallation de l'agent..."
+    sudo rpm -e "ninjarmm-agent" &>> "$LOG_FILE"
+    if [ $? -eq 0 ]; then
+        log "Agent désinstallé avec succès."
+    else
+        log "Erreur lors de la désinstallation de l'agent."
+    fi
 }
 
 # Affichage ASCII art pour le menu
 clear
-echo -e "\n\033[1;32m"  # Couleur verte pour le texte
+echo -e "\n\033[1;32m"
 echo "███╗   ██╗██╗███╗   ██╗     ██╗ █████╗  █████╗     ██╗"
 echo "████╗  ██║██║████╗  ██║     ██║██╔══██╗██╔══██╗    ██║"
 echo "██╔██╗ ██║██║██╔██╗ ██║     ██║███████║███████║    ██║"
 echo "██║╚██╗██║██║██║╚██╗██║██   ██║██╔══██║██╔══██║    ╚═╝"
 echo "██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║██║  ██║    ██╗"
 echo "╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝    ╚═╝"
-echo -e "\033[0m\n"  # Réinitialiser la couleur
+echo -e "\033[0m\n"
 
 # Menu principal
 while true; do
@@ -65,7 +84,8 @@ while true; do
         1) download_and_install ;;
         2) check_service_status ;;
         3) uninstall_agent ;;
-        4) echo "Au revoir !"; exit 0 ;;
-        *) echo "Option invalide. Veuillez réessayer." ;;
+        4) log "Script terminé par l'utilisateur."; echo "Au revoir !"; exit 0 ;;
+        *) log "Option invalide sélectionnée."; echo "Option invalide. Veuillez réessayer." ;;
     esac
 done
+

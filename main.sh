@@ -6,16 +6,39 @@
 # =====================================
 
 # Variables
-DOWNLOAD_DIR="/tmp"                            # Répertoire temporaire pour le téléchargement
-SERVICE_NAME="ninjarmm-agent.service"          # Nom du service pour vérifier son état
-PREDEFINED_AGENT_URL="http://example.com/agent.rpm"  # Lien prédéfini pour l'installation de l'agent
+DOWNLOAD_DIR="/tmp"
+SERVICE_NAME="ninjarmm-agent.service"
+PREDEFINED_AGENT_URL="http://example.com/agent.rpm"
+LOG_FILE="/var/log/ninjarmm_agent_manager.log"
 
 # Couleurs pour le style
 GREEN="\033[1;32m"
 BLUE="\033[1;34m"
 RED="\033[1;31m"
 YELLOW="\033[1;33m"
-NC="\033[0m" # Pas de couleur
+NC="\033[0m"
+
+# Vérifier les permissions du script (exigent être root)
+function check_permissions() {
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}⚠️ Ce script doit être exécuté en tant qu'utilisateur root.${NC}"
+        exit 1
+    fi
+}
+
+# Initialiser le fichier log
+function init_log() {
+    echo "=== RMM Agent Manager Script ===" > "$LOG_FILE"
+    echo "Démarré le : $(date)" >> "$LOG_FILE"
+    echo "================================" >> "$LOG_FILE"
+}
+
+# Fonction : journaliser les messages dans un fichier log
+function log_message() {
+    local log_type="$1"
+    local log_message="$2"
+    echo "[${log_type}] $(date '+%Y-%m-%d %H:%M:%S') - $log_message" >> "$LOG_FILE"
+}
 
 # Fonctions utilitaires
 function draw_separator() {
@@ -32,25 +55,31 @@ function display_message() {
 function install_with_default_url() {
     clear
     draw_separator
-    display_message "$YELLOW" "Téléchargement et installation depuis le lien prédéfini"
+    display_message "$YELLOW" "Installation depuis le lien prédéfini"
     draw_separator
 
+    local FILENAME
     FILENAME=$(basename "$PREDEFINED_AGENT_URL")
 
-    # Télécharger et installer l'agent
+    # Télécharger l'agent
     echo -e "Téléchargement de l'agent depuis ${GREEN}$PREDEFINED_AGENT_URL${NC} vers ${YELLOW}$DOWNLOAD_DIR${NC}..."
     curl -o "$DOWNLOAD_DIR/$FILENAME" "$PREDEFINED_AGENT_URL" --progress-bar
 
     if [ $? -eq 0 ]; then
         display_message "$GREEN" "Téléchargement réussi. Installation en cours..."
+        log_message "INFO" "Téléchargement depuis le lien prédéfini : $PREDEFINED_AGENT_URL réussi."
+
         sudo rpm -i "$DOWNLOAD_DIR/$FILENAME"
         if [ $? -eq 0 ]; then
             display_message "$GREEN" "L'installation de l'agent a été effectuée avec succès."
+            log_message "INFO" "Installation de l'agent depuis $PREDEFINED_AGENT_URL réussie."
         else
             display_message "$RED" "⚠️ Erreur lors de l'installation de l'agent."
+            log_message "ERROR" "Échec de l'installation de l'agent depuis $DOWNLOAD_DIR/$FILENAME."
         fi
     else
         display_message "$RED" "⚠️ Échec du téléchargement. Vérifiez le lien prédéfini et réessayez."
+        log_message "ERROR" "Échec du téléchargement depuis $PREDEFINED_AGENT_URL."
     fi
 }
 
@@ -58,9 +87,10 @@ function install_with_default_url() {
 function install_with_custom_url() {
     clear
     draw_separator
-    display_message "$YELLOW" "Téléchargement et installation depuis un lien personnalisé"
+    display_message "$YELLOW" "Installation depuis un lien personnalisé"
     draw_separator
 
+    local CUSTOM_AGENT_URL
     while true; do
         read -p "Veuillez entrer l'URL de l'agent que vous souhaitez télécharger : " CUSTOM_AGENT_URL
         if [[ -n $CUSTOM_AGENT_URL ]]; then
@@ -70,22 +100,28 @@ function install_with_custom_url() {
         fi
     done
 
+    local FILENAME
     FILENAME=$(basename "$CUSTOM_AGENT_URL")
 
-    # Télécharger et installer l'agent
+    # Télécharger l'agent
     echo -e "Téléchargement de l'agent depuis ${GREEN}$CUSTOM_AGENT_URL${NC} vers ${YELLOW}$DOWNLOAD_DIR${NC}..."
     curl -o "$DOWNLOAD_DIR/$FILENAME" "$CUSTOM_AGENT_URL" --progress-bar
 
     if [ $? -eq 0 ]; then
         display_message "$GREEN" "Téléchargement réussi. Installation en cours..."
+        log_message "INFO" "Téléchargement depuis une URL : $CUSTOM_AGENT_URL réussi."
+
         sudo rpm -i "$DOWNLOAD_DIR/$FILENAME"
         if [ $? -eq 0 ]; then
             display_message "$GREEN" "L'installation de l'agent a été effectuée avec succès."
+            log_message "INFO" "Installation depuis $CUSTOM_AGENT_URL réussie."
         else
             display_message "$RED" "⚠️ Erreur lors de l'installation de l'agent."
+            log_message "ERROR" "Échec de l'installation depuis $DOWNLOAD_DIR/$FILENAME."
         fi
     else
-        display_message "$RED" "⚠️ Échec du téléchargement. Vérifiez le lien entré et réessayez."
+        display_message "$RED" "⚠️ Échec du téléchargement. Vérifiez l'URL et réessayez."
+        log_message "ERROR" "Échec du téléchargement depuis $CUSTOM_AGENT_URL."
     fi
 }
 
@@ -98,9 +134,11 @@ function check_service_status() {
 
     if systemctl is-active --quiet "$SERVICE_NAME"; then
         display_message "$GREEN" "✅ Le service $SERVICE_NAME est actif et fonctionne correctement."
+        log_message "INFO" "Le service $SERVICE_NAME est actif."
     else
         display_message "$RED" "❌ Le service $SERVICE_NAME n'est pas actif."
         echo -e "💡 Essayez de démarrer le service avec :${BLUE} sudo systemctl start $SERVICE_NAME${NC}"
+        log_message "WARN" "Le service $SERVICE_NAME n'est pas actif."
     fi
 }
 
@@ -114,12 +152,14 @@ function uninstall_agent() {
     sudo rpm -e "ninjarmm-agent"
     if [ $? -eq 0 ]; then
         display_message "$GREEN" "✅ L'agent a été désinstallé avec succès."
+        log_message "INFO" "Désinstallation de l'agent réussie."
     else
         display_message "$RED" "⚠️ Une erreur s'est produite lors de la désinstallation de l'agent."
+        log_message "ERROR" "Échec de la désinstallation de l'agent."
     fi
 }
 
-# Affichage ASCII art pour le menu (v1.0 et credits ajoutés)
+# Affichage ASCII art pour le menu
 function show_header() {
     clear
     echo -e "${GREEN}"
@@ -134,6 +174,10 @@ function show_header() {
     echo -e "${YELLOW}        Version v1.0         |   Created by Root3301 (R.V)${NC}"
     draw_separator
 }
+
+# Vérifier les permissions et initialiser le fichier log
+check_permissions
+init_log
 
 # Menu principal
 while true; do
@@ -152,16 +196,18 @@ while true; do
         2) install_with_custom_url ;;
         3) check_service_status ;;
         4) uninstall_agent ;;
-        5) 
+        5)
             display_message "$GREEN" "Merci d'avoir utilisé ce script ! À bientôt."
-            exit 0 
+            log_message "INFO" "Script terminé par l'utilisateur."
+            exit 0
             ;;
         *) 
             display_message "$RED" "⚠️ Option invalide. Veuillez sélectionner une option valide."
+            log_message "WARN" "Utilisateur a choisi une option invalide."
             ;;
     esac
-    # Pause avant de retourner au menu principal
     read -p "Appuyez sur [Entrée] pour continuer..."
 done
+
 
 

@@ -10,27 +10,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env"
 
-DEFAULT_PREDEFINED_AGENT_URL="http://example.com/agent.rpm"
-DEFAULT_SERVICE_NAME="ninjarmm-agent.service"
-DEFAULT_LOG_FILE="/var/log/ninjarmm_agent_manager.log"
-DEFAULT_DOWNLOAD_DIR="/tmp"
-DEFAULT_AGENT_PACKAGE_NAME="ninjarmm-agent"
-DEFAULT_AGENT_PACKAGE_TYPE="auto"
-DEFAULT_LOG_LEVEL="INFO"
-
-if [[ -f "$ENV_FILE" ]]; then
-    set -a
-    source "$ENV_FILE"
-    set +a
+if [[ ! -f "$ENV_FILE" ]]; then
+    echo -e "\033[1;31m⚠️ Fichier .env introuvable !\033[0m"
+    echo -e "\033[1;33mVeuillez créer un fichier .env à partir de .env.example\033[0m"
+    echo -e "\033[1;34mCommande : cp .env.example .env\033[0m"
+    exit 1
 fi
 
-PREDEFINED_AGENT_URL="${PREDEFINED_AGENT_URL:-$DEFAULT_PREDEFINED_AGENT_URL}"
-SERVICE_NAME="${SERVICE_NAME:-$DEFAULT_SERVICE_NAME}"
-LOG_FILE="${LOG_FILE:-$DEFAULT_LOG_FILE}"
-DOWNLOAD_DIR="${DOWNLOAD_DIR:-$DEFAULT_DOWNLOAD_DIR}"
-AGENT_PACKAGE_NAME="${AGENT_PACKAGE_NAME:-$DEFAULT_AGENT_PACKAGE_NAME}"
-AGENT_PACKAGE_TYPE="${AGENT_PACKAGE_TYPE:-$DEFAULT_AGENT_PACKAGE_TYPE}"
-LOG_LEVEL="${LOG_LEVEL:-$DEFAULT_LOG_LEVEL}"
+set -a
+source "$ENV_FILE"
+set +a
 
 GREEN="\033[1;32m"
 BLUE="\033[1;34m"

@@ -253,9 +253,11 @@ function install_with_default_url() {
         if install_package "$target_file"; then
             display_message "$GREEN" "✅ L'installation de l'agent a été effectuée avec succès."
             log_message "INFO" "Installation réussie depuis $PREDEFINED_AGENT_URL"
+            rm -f "$target_file" 2>/dev/null || true
         else
             display_message "$RED" "⚠️ Erreur lors de l'installation de l'agent."
             log_message "ERROR" "Échec de l'installation depuis $target_file"
+            return 1
         fi
     else
         display_message "$RED" "⚠️ Échec du téléchargement."
@@ -291,13 +293,80 @@ function install_with_custom_url() {
         if install_package "$target_file"; then
             display_message "$GREEN" "✅ L'installation de l'agent a été effectuée avec succès."
             log_message "INFO" "Installation réussie depuis $custom_url"
+            rm -f "$target_file" 2>/dev/null || true
         else
             display_message "$RED" "⚠️ Erreur lors de l'installation de l'agent."
             log_message "ERROR" "Échec de l'installation depuis $target_file"
+            return 1
         fi
     else
         display_message "$RED" "⚠️ Échec du téléchargement."
         log_message "ERROR" "Échec du téléchargement depuis $custom_url"
+        return 1
+    fi
+}
+
+function start_service() {
+    clear
+    draw_separator
+    display_message "$YELLOW" "Démarrage du service $SERVICE_NAME"
+    draw_separator
+
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+        display_message "$YELLOW" "ℹ️ Le service est déjà actif."
+        log_message "INFO" "Tentative de démarrage d'un service déjà actif."
+        return 0
+    fi
+
+    if systemctl start "$SERVICE_NAME" 2>&1; then
+        display_message "$GREEN" "✅ Le service $SERVICE_NAME a été démarré avec succès."
+        log_message "INFO" "Service $SERVICE_NAME démarré."
+        sleep 2
+        systemctl status "$SERVICE_NAME" --no-pager | head -n 10
+    else
+        display_message "$RED" "⚠️ Échec du démarrage du service."
+        log_message "ERROR" "Échec du démarrage du service $SERVICE_NAME."
+        return 1
+    fi
+}
+
+function stop_service() {
+    clear
+    draw_separator
+    display_message "$YELLOW" "Arrêt du service $SERVICE_NAME"
+    draw_separator
+
+    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+        display_message "$YELLOW" "ℹ️ Le service est déjà arrêté."
+        log_message "INFO" "Tentative d'arrêt d'un service déjà arrêté."
+        return 0
+    fi
+
+    if systemctl stop "$SERVICE_NAME" 2>&1; then
+        display_message "$GREEN" "✅ Le service $SERVICE_NAME a été arrêté avec succès."
+        log_message "INFO" "Service $SERVICE_NAME arrêté."
+    else
+        display_message "$RED" "⚠️ Échec de l'arrêt du service."
+        log_message "ERROR" "Échec de l'arrêt du service $SERVICE_NAME."
+        return 1
+    fi
+}
+
+function restart_service() {
+    clear
+    draw_separator
+    display_message "$YELLOW" "Redémarrage du service $SERVICE_NAME"
+    draw_separator
+
+    if systemctl restart "$SERVICE_NAME" 2>&1; then
+        display_message "$GREEN" "✅ Le service $SERVICE_NAME a été redémarré avec succès."
+        log_message "INFO" "Service $SERVICE_NAME redémarré."
+        sleep 2
+        systemctl status "$SERVICE_NAME" --no-pager | head -n 10
+    else
+        display_message "$RED" "⚠️ Échec du redémarrage du service."
+        log_message "ERROR" "Échec du redémarrage du service $SERVICE_NAME."
+        return 1
     fi
 }
 
@@ -460,38 +529,69 @@ function patch_agent() {
     echo -e "Téléchargement de la mise à jour depuis ${GREEN}$patch_url${NC}..."
 
     if download_file "$patch_url" "$target_file"; then
-        display_message "$GREEN" "Téléchargement réussi. Installation de la mise à jour..."
+        display_message "$GREEN" "Téléchargement réussi."
 
+        local service_was_running=false
+        if systemctl is-active --quiet "$SERVICE_NAME"; then
+            service_was_running=true
+            display_message "$YELLOW" "Arrêt du service avant la mise à jour..."
+            systemctl stop "$SERVICE_NAME" || true
+            sleep 2
+        fi
+
+        display_message "$YELLOW" "Installation de la mise à jour..."
         local pkg_type
         pkg_type=$(detect_package_type "$target_file")
+        local update_success=false
 
         case "$pkg_type" in
             rpm)
-                if rpm -U "$target_file"; then
-                    display_message "$GREEN" "✅ Mise à jour effectuée avec succès."
-                    log_message "INFO" "Patch réussi depuis $patch_url"
-                else
-                    display_message "$RED" "⚠️ Erreur lors de la mise à jour."
-                    log_message "ERROR" "Échec du patch depuis $target_file"
+                if rpm -U "$target_file" 2>&1; then
+                    update_success=true
                 fi
                 ;;
             deb)
-                if install_package "$target_file"; then
-                    display_message "$GREEN" "✅ Mise à jour effectuée avec succès."
-                    log_message "INFO" "Patch réussi depuis $patch_url"
-                else
-                    display_message "$RED" "⚠️ Erreur lors de la mise à jour."
-                    log_message "ERROR" "Échec du patch depuis $target_file"
+                if dpkg -i "$target_file" 2>&1 && apt-get install -f -y 2>&1; then
+                    update_success=true
                 fi
                 ;;
             *)
                 display_message "$RED" "⚠️ Type de package non reconnu."
                 log_message "ERROR" "Type de package inconnu pour le patch : $target_file"
+                return 1
                 ;;
         esac
+
+        if [[ "$update_success" == "true" ]]; then
+            display_message "$GREEN" "✅ Mise à jour effectuée avec succès."
+            log_message "INFO" "Patch réussi depuis $patch_url"
+
+            if [[ "$service_was_running" == "true" ]]; then
+                display_message "$YELLOW" "Redémarrage du service..."
+                sleep 2
+                if systemctl start "$SERVICE_NAME" 2>&1; then
+                    display_message "$GREEN" "✅ Service redémarré avec succès."
+                    log_message "INFO" "Service redémarré après patch."
+                else
+                    display_message "$RED" "⚠️ Échec du redémarrage du service."
+                    log_message "ERROR" "Échec du redémarrage après patch."
+                fi
+            fi
+
+            rm -f "$target_file" 2>/dev/null || true
+        else
+            display_message "$RED" "⚠️ Erreur lors de la mise à jour."
+            log_message "ERROR" "Échec du patch depuis $target_file"
+
+            if [[ "$service_was_running" == "true" ]]; then
+                display_message "$YELLOW" "Tentative de redémarrage du service..."
+                systemctl start "$SERVICE_NAME" 2>&1 || true
+            fi
+        fi
     else
         display_message "$RED" "⚠️ Échec du téléchargement de la mise à jour."
         log_message "ERROR" "Échec du téléchargement du patch depuis $patch_url"
+        return 1
     fi
 }
 
@@ -562,14 +662,17 @@ check_dependencies || exit 1
 while true; do
     show_header
     echo -e "${YELLOW}Que souhaitez-vous faire ?${NC}"
-    echo "1) Installer l'agent (lien prédéfini)"
-    echo "2) Installer l'agent (lien personnalisé)"
-    echo "3) Vérifier le statut du service"
-    echo "4) Mettre à jour l'agent (Patch)"
-    echo "5) Désinstaller l'agent"
-    echo "6) Afficher les logs"
-    echo "7) Diagnostic de santé (Health Check)"
-    echo "8) Quitter"
+    echo "1)  Installer l'agent (lien prédéfini)"
+    echo "2)  Installer l'agent (lien personnalisé)"
+    echo "3)  Vérifier le statut du service"
+    echo "4)  Démarrer le service"
+    echo "5)  Arrêter le service"
+    echo "6)  Redémarrer le service"
+    echo "7)  Mettre à jour l'agent (Patch)"
+    echo "8)  Désinstaller l'agent"
+    echo "9)  Afficher les logs"
+    echo "10) Diagnostic de santé (Health Check)"
+    echo "11) Quitter"
     draw_separator
     read -rp "→ Votre choix : " choice
 
@@ -577,11 +680,14 @@ while true; do
         1) install_with_default_url ;;
         2) install_with_custom_url ;;
         3) check_service_status ;;
-        4) patch_agent ;;
-        5) uninstall_agent ;;
-        6) show_logs ;;
-        7) health_check ;;
-        8)
+        4) start_service ;;
+        5) stop_service ;;
+        6) restart_service ;;
+        7) patch_agent ;;
+        8) uninstall_agent ;;
+        9) show_logs ;;
+        10) health_check ;;
+        11)
             display_message "$GREEN" "Merci d'avoir utilisé ce script !"
             log_message "INFO" "Script terminé par l'utilisateur."
             exit 0

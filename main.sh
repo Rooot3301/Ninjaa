@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # =====================================
-#      RMM Agent Manager v2.0
+#      RMM Agent Manager v3.0
 #      Created by Root3301 (R.V)
 # =====================================
 
@@ -67,7 +67,7 @@ function init_log() {
 
     if [[ ! -f "$LOG_FILE" ]]; then
         {
-            echo "=== RMM Agent Manager Script v2.0 ==="
+            echo "=== RMM Agent Manager Script v3.0 ==="
             echo "Initialisé le : $(date)"
             echo "======================================="
         } > "$LOG_FILE" 2>/dev/null || {
@@ -742,7 +742,7 @@ function show_header() {
     echo "╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝    ╚═╝"
     echo -e "${NC}"
     draw_separator
-    echo -e "${YELLOW}        Version v2.0         |   Created by Root3301 (R.V)${NC}"
+    echo -e "${YELLOW}        Version v3.0         |   Created by Root3301 (R.V)${NC}"
     draw_separator
 }
 
@@ -774,7 +774,7 @@ function handle_non_interactive_mode() {
             exit $?
             ;;
         --help)
-            echo "RMM Agent Manager v2.0"
+            echo "RMM Agent Manager v3.0"
             echo ""
             echo "Usage: $0 [OPTIONS]"
             echo ""

@@ -1,4 +1,4 @@
-# 🛠️ RMM Agent Manager v2.0
+# 🛠️ RMM Agent Manager v3.0
 
 Script shell avancé pour gérer l'installation, la mise à jour, la vérification et la désinstallation d'agents RMM (comme NinjaRMM) sur des machines Linux. Ce script supporte aussi bien les distributions basées sur RPM (Red Hat, CentOS, Fedora) que sur DEB (Debian, Ubuntu).
 
@@ -7,7 +7,7 @@ Script shell avancé pour gérer l'installation, la mise à jour, la vérificati
 ## 📋 Sommaire
 
 - [Fonctionnalités](#fonctionnalités)
-- [Nouveautés v2.0](#nouveautés-v20)
+- [Nouveautés v3.0](#nouveautés-v30)
 - [Prérequis](#prérequis)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -37,7 +37,7 @@ Script shell avancé pour gérer l'installation, la mise à jour, la vérificati
 
 ---
 
-## 🎉 Nouveautés v2.0
+## 🎉 Nouveautés v3.0
 
 ### Améliorations majeures
 
@@ -384,7 +384,7 @@ Les contributions sont les bienvenues ! N'hésitez pas à :
 
 ## 📝 Changelog
 
-### v2.0 (2025-12-03)
+### v3.0 (2026-05-29)
 - Ajout de la configuration externalisée (.env)
 - Support complet des packages .deb (Debian/Ubuntu)
 - Détection automatique du type de package

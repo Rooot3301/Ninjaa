@@ -209,11 +209,10 @@ function verify_checksum() {
         return 0
     fi
 
+    local got=""
     if command -v sha256sum &> /dev/null; then
-        local got
         got=$(sha256sum "$file" 2>/dev/null | awk '{print $1}') || got=""
     elif command -v shasum &> /dev/null; then
-        local got
         got=$(shasum -a 256 "$file" 2>/dev/null | awk '{print $1}') || got=""
     else
         display_message "$YELLOW" "⚠️ Aucun utilitaire de checksum disponible (sha256sum/shasum). Vérification ignorée."
@@ -397,7 +396,7 @@ function uninstall_package() {
     if [[ "$pkg_type" == "auto" ]]; then
         if command -v rpm &> /dev/null && rpm -q "$AGENT_PACKAGE_NAME" &> /dev/null; then
             pkg_type="rpm"
-        elif command -v dpkg &> /dev/null && dpkg -l | grep -q "^ii.*$AGENT_PACKAGE_NAME"; then
+        elif command -v dpkg &> /dev/null && dpkg -l | grep -qF " $AGENT_PACKAGE_NAME "; then
             pkg_type="deb"
         fi
     fi
@@ -484,6 +483,7 @@ function install_with_default_url() {
     else
         display_message "$RED" "⚠️ Échec du téléchargement."
         log_message "ERROR" "Échec du téléchargement depuis $PREDEFINED_AGENT_URL"
+        return 1
     fi
 }
 
@@ -675,9 +675,9 @@ function health_check() {
     if command -v rpm &> /dev/null && rpm -q "$AGENT_PACKAGE_NAME" &> /dev/null; then
         display_message "$GREEN" "✅ Package installé (RPM)"
         rpm -qi "$AGENT_PACKAGE_NAME" | grep -E "(Name|Version|Install Date)"
-    elif command -v dpkg &> /dev/null && dpkg -l | grep -q "^ii.*$AGENT_PACKAGE_NAME"; then
+    elif command -v dpkg &> /dev/null && dpkg -l | grep -qF " $AGENT_PACKAGE_NAME "; then
         display_message "$GREEN" "✅ Package installé (DEB)"
-        dpkg -l | grep "$AGENT_PACKAGE_NAME"
+        dpkg -l | grep -F "$AGENT_PACKAGE_NAME"
     else
         display_message "$RED" "❌ Package non installé"
         status=1
@@ -785,6 +785,13 @@ function patch_agent() {
 
     if download_file "$patch_url" "$target_file"; then
         display_message "$GREEN" "Téléchargement réussi."
+
+        if [[ "${ALLOW_INSTALL,,}" != "true" ]]; then
+            display_message "$YELLOW" "ℹ️ L'installation automatique est désactivée (ALLOW_INSTALL=false). Le fichier est disponible ici : $target_file"
+            display_message "$YELLOW" "ℹ️ Pour mettre à jour manuellement : 'sudo rpm -U $target_file' ou 'sudo dpkg -i $target_file' selon la distribution."
+            log_message "INFO" "Patch bloqué par ALLOW_INSTALL=false; package téléchargé: $target_file"
+            return 0
+        fi
 
         local service_was_running=false
         if systemctl is-active --quiet "$SERVICE_NAME"; then

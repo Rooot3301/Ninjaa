@@ -36,6 +36,7 @@ set +a
 : "${AGENT_PACKAGE_TYPE:=auto}"
 : "${LOG_LEVEL:=INFO}"
 : "${SYSTEMD_SAFE_OVERRIDE:=false}"
+: "${ALLOW_INSTALL:=false}"
 
 # Normalisation basique des variables (suppression CR/newline, sécurisation de noms)
 PREDEFINED_AGENT_URL="$(echo "$PREDEFINED_AGENT_URL" | tr -d '\r\n')"
@@ -52,6 +53,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-systemd-override)
             SYSTEMD_SAFE_OVERRIDE=false
+            shift
+            ;;
+        --allow-install)
+            ALLOW_INSTALL=true
+            shift
+            ;;
+        --no-allow-install)
+            ALLOW_INSTALL=false
             shift
             ;;
         *)
@@ -304,6 +313,13 @@ function install_via_installer_script() {
 
     chmod +x "$installer_file" 2>/dev/null || true
 
+    if [[ "${ALLOW_INSTALL,,}" != "true" ]]; then
+        display_message "$YELLOW" "ℹ️ L'exécution d'installateurs distants est désactivée (ALLOW_INSTALL=false). Le script est disponible ici : $installer_file"
+        display_message "$YELLOW" "ℹ️ Exécutez manuellement : 'sudo bash $installer_file' si vous l'autorisez."
+        log_message "INFO" "Installation via script bloquée; installer téléchargé: $installer_file"
+        return 0
+    fi
+
     # Exécuter le script avec variables d'environnement si fournies
     if [[ -n "$installer_token" ]]; then
         INSTALLER_TOKEN="$installer_token" bash "$installer_file"
@@ -444,7 +460,16 @@ function install_with_default_url() {
                 return 1
             fi
         fi
-        display_message "$GREEN" "Téléchargement réussi. Installation en cours..."
+        display_message "$GREEN" "Téléchargement réussi."
+
+        if [[ "${ALLOW_INSTALL,,}" != "true" ]]; then
+            display_message "$YELLOW" "ℹ️ L'installation automatique est désactivée (ALLOW_INSTALL=false). Le fichier est disponible ici : $target_file"
+            display_message "$YELLOW" "ℹ️ Pour installer manuellement : 'sudo rpm -i $target_file' ou 'sudo dpkg -i $target_file' selon la distribution."
+            log_message "INFO" "Installation automatique bloquée; package téléchargé: $target_file"
+            return 0
+        fi
+
+        display_message "$GREEN" "Installation en cours..."
 
         if install_package "$target_file"; then
             display_message "$GREEN" "✅ L'installation de l'agent a été effectuée avec succès."
@@ -491,7 +516,15 @@ function install_with_custom_url() {
                 return 1
             fi
         fi
-        display_message "$GREEN" "Téléchargement réussi. Installation en cours..."
+        display_message "$GREEN" "Téléchargement réussi."
+        if [[ "${ALLOW_INSTALL,,}" != "true" ]]; then
+            display_message "$YELLOW" "ℹ️ L'installation automatique est désactivée (ALLOW_INSTALL=false). Le fichier est disponible ici : $target_file"
+            display_message "$YELLOW" "ℹ️ Pour installer manuellement : 'sudo rpm -i $target_file' ou 'sudo dpkg -i $target_file' selon la distribution."
+            log_message "INFO" "Installation automatique bloquée; package téléchargé: $target_file"
+            return 0
+        fi
+
+        display_message "$GREEN" "Installation en cours..."
         if install_package "$target_file"; then
             display_message "$GREEN" "✅ L'installation de l'agent a été effectuée avec succès."
             log_message "INFO" "Installation réussie depuis $custom_url"

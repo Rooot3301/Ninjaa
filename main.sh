@@ -396,7 +396,7 @@ function uninstall_package() {
     if [[ "$pkg_type" == "auto" ]]; then
         if command -v rpm &> /dev/null && rpm -q "$AGENT_PACKAGE_NAME" &> /dev/null; then
             pkg_type="rpm"
-        elif command -v dpkg &> /dev/null && dpkg -l | grep -qF " $AGENT_PACKAGE_NAME "; then
+        elif command -v dpkg &> /dev/null && dpkg -s "$AGENT_PACKAGE_NAME" 2>/dev/null | grep -q "^Status: install ok installed"; then
             pkg_type="deb"
         fi
     fi
@@ -675,9 +675,9 @@ function health_check() {
     if command -v rpm &> /dev/null && rpm -q "$AGENT_PACKAGE_NAME" &> /dev/null; then
         display_message "$GREEN" "✅ Package installé (RPM)"
         rpm -qi "$AGENT_PACKAGE_NAME" | grep -E "(Name|Version|Install Date)"
-    elif command -v dpkg &> /dev/null && dpkg -l | grep -qF " $AGENT_PACKAGE_NAME "; then
+    elif command -v dpkg &> /dev/null && dpkg -s "$AGENT_PACKAGE_NAME" 2>/dev/null | grep -q "^Status: install ok installed"; then
         display_message "$GREEN" "✅ Package installé (DEB)"
-        dpkg -l | grep -F "$AGENT_PACKAGE_NAME"
+        dpkg -s "$AGENT_PACKAGE_NAME" | grep -E "^(Package|Version|Status)"
     else
         display_message "$RED" "❌ Package non installé"
         status=1

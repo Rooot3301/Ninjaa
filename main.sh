@@ -35,6 +35,7 @@ set +a
 : "${AGENT_PACKAGE_NAME:=ninjarmm-agent}"
 : "${AGENT_PACKAGE_TYPE:=auto}"
 : "${LOG_LEVEL:=INFO}"
+: "${SYSTEMD_SAFE_OVERRIDE:=true}"
 
 # Normalisation basique des variables (suppression CR/newline, sécurisation de noms)
 PREDEFINED_AGENT_URL="$(echo "$PREDEFINED_AGENT_URL" | tr -d '\r\n')"
@@ -203,6 +204,45 @@ function verify_checksum() {
     fi
 }
 
+function create_systemd_dropin() {
+    if [[ "${SYSTEMD_SAFE_OVERRIDE,,}" != "true" ]]; then
+        log_message "INFO" "SYSTEMD_SAFE_OVERRIDE not enabled; skipping drop-in creation."
+        return 0
+    fi
+
+    if ! command -v systemctl &> /dev/null; then
+        log_message "WARN" "systemctl not available; cannot create systemd drop-in."
+        return 0
+    fi
+
+    local svc_dir
+    svc_dir="/etc/systemd/system/${SERVICE_NAME}.d"
+    local override_file="$svc_dir/override.conf"
+
+    mkdir -p "$svc_dir" 2>/dev/null || {
+        log_message "ERROR" "Impossible de créer $svc_dir"
+        return 1
+    }
+
+    cat > "$override_file" <<EOF
+[Unit]
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Restart=on-failure
+RestartSec=5
+EOF
+
+    log_message "INFO" "Création du drop-in systemd: $override_file"
+    display_message "$YELLOW" "Applied systemd safe override to $SERVICE_NAME"
+
+    systemctl daemon-reload 2>/dev/null || true
+    # try to restart service to apply new policy
+    systemctl restart "$SERVICE_NAME" 2>/dev/null || true
+    return 0
+}
+
 function selinux_apparmor_check() {
     if command -v getenforce &> /dev/null; then
         local se
@@ -257,6 +297,9 @@ function install_via_installer_script() {
     fi
 
     local rc=$?
+    if [[ $rc -eq 0 ]]; then
+        create_systemd_dropin || true
+    fi
     rm -f "$installer_file" 2>/dev/null || true
     return $rc
 }
@@ -389,6 +432,7 @@ function install_with_default_url() {
         if install_package "$target_file"; then
             display_message "$GREEN" "✅ L'installation de l'agent a été effectuée avec succès."
             log_message "INFO" "Installation réussie depuis $PREDEFINED_AGENT_URL"
+            create_systemd_dropin || true
             rm -f "$target_file" 2>/dev/null || true
         else
             display_message "$RED" "⚠️ Erreur lors de l'installation de l'agent."
@@ -431,10 +475,10 @@ function install_with_custom_url() {
             fi
         fi
         display_message "$GREEN" "Téléchargement réussi. Installation en cours..."
-
         if install_package "$target_file"; then
             display_message "$GREEN" "✅ L'installation de l'agent a été effectuée avec succès."
             log_message "INFO" "Installation réussie depuis $custom_url"
+            create_systemd_dropin || true
             rm -f "$target_file" 2>/dev/null || true
         else
             display_message "$RED" "⚠️ Erreur lors de l'installation de l'agent."

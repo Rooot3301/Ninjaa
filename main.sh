@@ -575,6 +575,7 @@ function health_check() {
     draw_separator
 
     local status=0
+    local process_found=false
 
     echo -e "${BLUE}1. Vérification de l'installation du package...${NC}"
     if command -v rpm &> /dev/null && rpm -q "$AGENT_PACKAGE_NAME" &> /dev/null; then
@@ -593,9 +594,21 @@ function health_check() {
     if systemctl is-active --quiet "$SERVICE_NAME"; then
         display_message "$GREEN" "✅ Service actif"
         systemctl show "$SERVICE_NAME" --property=MainPID,ActiveState,SubState --no-pager
+
+        # Récupérer le MainPID fourni par systemd et vérifier le processus
+        local mainpid
+        mainpid=$(systemctl show "$SERVICE_NAME" --property=MainPID --value 2>/dev/null || echo "")
+        if [[ -n "$mainpid" && "$mainpid" -ne 0 && -d "/proc/$mainpid" ]]; then
+            display_message "$GREEN" "✅ Processus principal trouvé (PID: $mainpid)"
+            ps -p "$mainpid" -o pid,cmd --no-headers || true
+            process_found=true
+        else
+            process_found=false
+        fi
     else
         display_message "$RED" "❌ Service inactif"
         status=1
+        process_found=false
     fi
 
     echo ""
@@ -608,12 +621,18 @@ function health_check() {
 
     echo ""
     echo -e "${BLUE}4. Vérification des processus...${NC}"
-    if pgrep -f "$AGENT_PACKAGE_NAME" > /dev/null; then
-        display_message "$GREEN" "✅ Processus en cours d'exécution"
-        pgrep -fa "$AGENT_PACKAGE_NAME"
+    if [[ "$process_found" == true ]]; then
+        # Processus principal déjà identifié via MainPID
+        :
     else
-        display_message "$RED" "❌ Aucun processus trouvé"
-        status=1
+        # Fallback : recherche par nom de package
+        if pgrep -f "$AGENT_PACKAGE_NAME" > /dev/null; then
+            display_message "$GREEN" "✅ Processus(s) trouvé(s) via pgrep"
+            pgrep -fa "$AGENT_PACKAGE_NAME"
+        else
+            display_message "$RED" "❌ Aucun processus trouvé"
+            status=1
+        fi
     fi
 
     echo ""

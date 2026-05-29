@@ -35,13 +35,30 @@ set +a
 : "${AGENT_PACKAGE_NAME:=ninjarmm-agent}"
 : "${AGENT_PACKAGE_TYPE:=auto}"
 : "${LOG_LEVEL:=INFO}"
-: "${SYSTEMD_SAFE_OVERRIDE:=true}"
+: "${SYSTEMD_SAFE_OVERRIDE:=false}"
 
 # Normalisation basique des variables (suppression CR/newline, sécurisation de noms)
 PREDEFINED_AGENT_URL="$(echo "$PREDEFINED_AGENT_URL" | tr -d '\r\n')"
 SERVICE_NAME="$(basename "$SERVICE_NAME")"
 AGENT_PACKAGE_NAME="$(basename "$AGENT_PACKAGE_NAME")"
 LOG_FILE="$(echo "$LOG_FILE" | tr -d '\r')"
+
+# Parse global CLI flags that affect behavior (consumed so they don't interfere with subcommands)
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --systemd-override)
+            SYSTEMD_SAFE_OVERRIDE=true
+            shift
+            ;;
+        --no-systemd-override)
+            SYSTEMD_SAFE_OVERRIDE=false
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 
 # S'assurer que le répertoire de téléchargement existe
 if [[ ! -d "$DOWNLOAD_DIR" ]]; then
@@ -238,8 +255,8 @@ EOF
     display_message "$YELLOW" "Applied systemd safe override to $SERVICE_NAME"
 
     systemctl daemon-reload 2>/dev/null || true
-    # try to restart service to apply new policy
-    systemctl restart "$SERVICE_NAME" 2>/dev/null || true
+    display_message "$YELLOW" "Note: le drop-in a été installé. Redémarrage manuel recommandé : 'sudo systemctl restart $SERVICE_NAME'"
+    log_message "INFO" "Systemd daemon reloaded; manual restart advised for $SERVICE_NAME"
     return 0
 }
 

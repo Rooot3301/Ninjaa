@@ -11,10 +11,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env"
 
 if [[ ! -f "$ENV_FILE" ]]; then
-    echo -e "\033[1;31m⚠️ Fichier .env introuvable !\033[0m"
-    echo -e "\033[1;33mVeuillez créer un fichier .env à partir de .env.example\033[0m"
-    echo -e "\033[1;34mCommande : cp .env.example .env\033[0m"
-    exit 1
+    if [[ -f "${SCRIPT_DIR}/.env.example" ]]; then
+        echo -e "\033[1;33mAucun fichier .env trouvé. Création automatique depuis .env.example…\033[0m"
+        cp "${SCRIPT_DIR}/.env.example" "$ENV_FILE"
+        echo -e "\033[1;32mFichier .env créé avec succès.\033[0m"
+    else
+        echo -e "\033[1;31m⚠️ Fichier .env introuvable !\033[0m"
+        echo -e "\033[1;33mVeuillez créer un fichier .env à partir de .env.example\033[0m"
+        echo -e "\033[1;34mCommande : cp .env.example .env\033[0m"
+        exit 1
+    fi
 fi
 
 set -a

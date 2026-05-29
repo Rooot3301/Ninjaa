@@ -746,6 +746,144 @@ function show_header() {
     draw_separator
 }
 
+function installation_menu() {
+    while true; do
+        clear
+        draw_separator
+        echo -e "${YELLOW}Menu Installation${NC}"
+        draw_separator
+        echo "1) Installer l'agent (lien prédéfini)"
+        echo "2) Installer l'agent (lien personnalisé)"
+        echo "3) Installer l'agent via script/token"
+        echo "4) Retour"
+        draw_separator
+        read -rp "→ Votre choix : " install_choice
+
+        case $install_choice in
+            1)
+                install_with_default_url
+                ;;
+            2)
+                install_with_custom_url
+                ;;
+            3)
+                selinux_apparmor_check
+                detect_pkg_manager
+                install_via_installer_script
+                ;;
+            4)
+                return 0
+                ;;
+            *)
+                display_message "$RED" "⚠️ Option invalide."
+                ;;
+        esac
+        read -rp "Appuyez sur [Entrée] pour continuer..."
+    done
+}
+
+function service_menu() {
+    while true; do
+        clear
+        draw_separator
+        echo -e "${YELLOW}Menu Service${NC}"
+        draw_separator
+        echo "1) Vérifier le statut du service"
+        echo "2) Démarrer le service"
+        echo "3) Arrêter le service"
+        echo "4) Redémarrer le service"
+        echo "5) Retour"
+        draw_separator
+        read -rp "→ Votre choix : " service_choice
+
+        case $service_choice in
+            1)
+                check_service_status
+                ;;
+            2)
+                start_service
+                ;;
+            3)
+                stop_service
+                ;;
+            4)
+                restart_service
+                ;;
+            5)
+                return 0
+                ;;
+            *)
+                display_message "$RED" "⚠️ Option invalide."
+                ;;
+        esac
+        read -rp "Appuyez sur [Entrée] pour continuer..."
+    done
+}
+
+function maintenance_menu() {
+    while true; do
+        clear
+        draw_separator
+        echo -e "${YELLOW}Menu Maintenance${NC}"
+        draw_separator
+        echo "1) Mettre à jour l'agent (Patch)"
+        echo "2) Désinstaller l'agent"
+        echo "3) Diagnostic de santé (Health Check)"
+        echo "4) Retour"
+        draw_separator
+        read -rp "→ Votre choix : " maintenance_choice
+
+        case $maintenance_choice in
+            1)
+                patch_agent
+                ;;
+            2)
+                uninstall_agent
+                ;;
+            3)
+                health_check
+                ;;
+            4)
+                return 0
+                ;;
+            *)
+                display_message "$RED" "⚠️ Option invalide."
+                ;;
+        esac
+        read -rp "Appuyez sur [Entrée] pour continuer..."
+    done
+}
+
+function logs_menu() {
+    while true; do
+        clear
+        draw_separator
+        echo -e "${YELLOW}Menu Logs & Diagnostics${NC}"
+        draw_separator
+        echo "1) Afficher les logs"
+        echo "2) Diagnostic de santé (Health Check)"
+        echo "3) Retour"
+        draw_separator
+        read -rp "→ Votre choix : " logs_choice
+
+        case $logs_choice in
+            1)
+                show_logs
+                ;;
+            2)
+                health_check
+                ;;
+            3)
+                return 0
+                ;;
+            *)
+                display_message "$RED" "⚠️ Option invalide."
+                ;;
+        esac
+        read -rp "Appuyez sur [Entrée] pour continuer..."
+    done
+}
+
 function handle_non_interactive_mode() {
     case "${1:-}" in
         --install-default)
@@ -780,6 +918,7 @@ function handle_non_interactive_mode() {
             echo ""
             echo "Options:"
             echo "  --install-default    Installer l'agent avec l'URL prédéfinie"
+            echo "  --install-with-token Installer l'agent via script/token"
             echo "  --status             Vérifier le statut du service"
             echo "  --health-check       Effectuer un diagnostic complet"
             echo "  --help               Afficher cette aide"
@@ -805,33 +944,22 @@ check_dependencies || exit 1
 
 while true; do
     show_header
-    echo -e "${YELLOW}Que souhaitez-vous faire ?${NC}"
-    echo "1)  Installer l'agent (lien prédéfini)"
-    echo "2)  Installer l'agent (lien personnalisé)"
-    echo "3)  Vérifier le statut du service"
-    echo "4)  Démarrer le service"
-    echo "5)  Arrêter le service"
-    echo "6)  Redémarrer le service"
-    echo "7)  Mettre à jour l'agent (Patch)"
-    echo "8)  Désinstaller l'agent"
-    echo "9)  Afficher les logs"
-    echo "10) Diagnostic de santé (Health Check)"
-    echo "11) Quitter"
+    echo -e "${YELLOW}Menu principal${NC}"
+    draw_separator
+    echo "1) Installation"
+    echo "2) Gestion du service"
+    echo "3) Maintenance"
+    echo "4) Logs & Diagnostics"
+    echo "5) Quitter"
     draw_separator
     read -rp "→ Votre choix : " choice
 
     case $choice in
-        1) install_with_default_url ;;
-        2) install_with_custom_url ;;
-        3) check_service_status ;;
-        4) start_service ;;
-        5) stop_service ;;
-        6) restart_service ;;
-        7) patch_agent ;;
-        8) uninstall_agent ;;
-        9) show_logs ;;
-        10) health_check ;;
-        11)
+        1) installation_menu ;;
+        2) service_menu ;;
+        3) maintenance_menu ;;
+        4) logs_menu ;;
+        5)
             display_message "$GREEN" "Merci d'avoir utilisé ce script !"
             log_message "INFO" "Script terminé par l'utilisateur."
             exit 0

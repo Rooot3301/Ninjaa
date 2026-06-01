@@ -360,7 +360,13 @@ function install_package() {
     case "$pkg_type" in
         rpm)
             if command -v rpm &> /dev/null; then
-                rpm -i "$package_file"
+                if rpm -q "$AGENT_PACKAGE_NAME" &>/dev/null; then
+                    log_message "INFO" "Package déjà installé, utilisation de rpm -U (upgrade)"
+                    display_message "$YELLOW" "ℹ️ Package déjà présent — mise à jour automatique (rpm -U)."
+                    rpm -U "$package_file"
+                else
+                    rpm -i "$package_file"
+                fi
                 return $?
             else
                 display_message "$RED" "⚠️ rpm n'est pas disponible sur ce système."

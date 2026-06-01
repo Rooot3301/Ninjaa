@@ -312,10 +312,7 @@ function install_via_installer_script() {
 
     chmod +x "$installer_file" 2>/dev/null || true
 
-    if [[ "${ALLOW_INSTALL,,}" != "true" ]]; then
-        display_message "$YELLOW" "ℹ️ L'exécution d'installateurs distants est désactivée (ALLOW_INSTALL=false). Le script est disponible ici : $installer_file"
-        display_message "$YELLOW" "ℹ️ Exécutez manuellement : 'sudo bash $installer_file' si vous l'autorisez."
-        log_message "INFO" "Installation via script bloquée; installer téléchargé: $installer_file"
+    if ! prompt_allow_install "$installer_file"; then
         return 0
     fi
 
@@ -417,6 +414,22 @@ function uninstall_package() {
     esac
 }
 
+function prompt_allow_install() {
+    local target_file="$1"
+    if [[ "${ALLOW_INSTALL,,}" == "true" ]]; then
+        return 0
+    fi
+    if [[ -t 0 ]]; then
+        read -rp "⚠️  ALLOW_INSTALL=false — installer quand même ? [o/N] : " confirm
+        if [[ "${confirm,,}" == "o" ]]; then
+            return 0
+        fi
+    fi
+    display_message "$YELLOW" "ℹ️ Installation annulée. Fichier conservé : $target_file"
+    log_message "INFO" "Installation bloquée (ALLOW_INSTALL=false); fichier: $target_file"
+    return 1
+}
+
 function draw_separator() {
     echo -e "${BLUE}=========================================================${NC}"
 }
@@ -461,10 +474,7 @@ function install_with_default_url() {
         fi
         display_message "$GREEN" "Téléchargement réussi."
 
-        if [[ "${ALLOW_INSTALL,,}" != "true" ]]; then
-            display_message "$YELLOW" "ℹ️ L'installation automatique est désactivée (ALLOW_INSTALL=false). Le fichier est disponible ici : $target_file"
-            display_message "$YELLOW" "ℹ️ Pour installer manuellement : 'sudo rpm -i $target_file' ou 'sudo dpkg -i $target_file' selon la distribution."
-            log_message "INFO" "Installation automatique bloquée; package téléchargé: $target_file"
+        if ! prompt_allow_install "$target_file"; then
             return 0
         fi
 
@@ -517,10 +527,8 @@ function install_with_custom_url() {
             fi
         fi
         display_message "$GREEN" "Téléchargement réussi."
-        if [[ "${ALLOW_INSTALL,,}" != "true" ]]; then
-            display_message "$YELLOW" "ℹ️ L'installation automatique est désactivée (ALLOW_INSTALL=false). Le fichier est disponible ici : $target_file"
-            display_message "$YELLOW" "ℹ️ Pour installer manuellement : 'sudo rpm -i $target_file' ou 'sudo dpkg -i $target_file' selon la distribution."
-            log_message "INFO" "Installation automatique bloquée; package téléchargé: $target_file"
+
+        if ! prompt_allow_install "$target_file"; then
             return 0
         fi
 
@@ -786,10 +794,7 @@ function patch_agent() {
     if download_file "$patch_url" "$target_file"; then
         display_message "$GREEN" "Téléchargement réussi."
 
-        if [[ "${ALLOW_INSTALL,,}" != "true" ]]; then
-            display_message "$YELLOW" "ℹ️ L'installation automatique est désactivée (ALLOW_INSTALL=false). Le fichier est disponible ici : $target_file"
-            display_message "$YELLOW" "ℹ️ Pour mettre à jour manuellement : 'sudo rpm -U $target_file' ou 'sudo dpkg -i $target_file' selon la distribution."
-            log_message "INFO" "Patch bloqué par ALLOW_INSTALL=false; package téléchargé: $target_file"
+        if ! prompt_allow_install "$target_file"; then
             return 0
         fi
 

@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  lint:
+    name: Shell lint & format checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Setup shfmt
+        uses: mvdan/setup-shfmt@v2
+        with:
+          version: 'v3.5.0'
+
+      - name: Check formatting with shfmt
+        run: |
+          files=$(shfmt -l .)
+          if [ -n "$files" ]; then
+            echo "shfmt found unformatted files:" >&2
+            echo "$files" >&2
+            echo
+            echo "Run: shfmt -w <files> to fix formatting." >&2
+            exit 1
+          fi
+
+      - name: Run shellcheck on shell scripts
+        run: |
+          find . -name '*.sh' -print0 | xargs -0 shellcheck -x || exit 1

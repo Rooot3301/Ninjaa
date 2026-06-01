@@ -356,7 +356,7 @@ Un `systemctl daemon-reload` est effectué automatiquement. Le redémarrage du s
 
 Le diagnostic vérifie dans l'ordre :
 
-1. **Installation du package** : Présence via `rpm -q` ou `dpkg -l`
+1. **Installation du package** : Présence via `rpm -q` ou `dpkg -s` (vérifie le champ `Status: install ok installed`)
 2. **État du service** : Actif/Inactif via `systemctl is-active`
 3. **Activation au démarrage** : Enabled/Disabled via `systemctl is-enabled`
 4. **Processus principal** : Via `MainPID` fourni par systemd (`/proc/<pid>`) — fallback sur `pgrep` si MainPID indisponible
